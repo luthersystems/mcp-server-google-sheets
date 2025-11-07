@@ -26,6 +26,8 @@ import google.auth
 # Constants
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 CREDENTIALS_CONFIG = os.environ.get('CREDENTIALS_CONFIG')
+CREDENTIALS_JSON_B64 = os.environ.get('CREDENTIALS_JSON_B64')  # Alternative name for CREDENTIALS_CONFIG
+TOKEN_JSON_B64 = os.environ.get('TOKEN_JSON_B64')  # Base64 encoded token JSON
 TOKEN_PATH = os.environ.get('TOKEN_PATH', 'token.json')
 CREDENTIALS_PATH = os.environ.get('CREDENTIALS_PATH', 'credentials.json')
 SERVICE_ACCOUNT_PATH = os.environ.get('SERVICE_ACCOUNT_PATH', 'service_account.json')
@@ -45,8 +47,16 @@ async def spreadsheet_lifespan(server: FastMCP) -> AsyncIterator[SpreadsheetCont
     # Authenticate and build the service
     creds = None
 
-    if CREDENTIALS_CONFIG:
-        creds = service_account.Credentials.from_service_account_info(json.loads(base64.b64decode(CREDENTIALS_CONFIG)), scopes=SCOPES)
+    # Check for base64 encoded credentials (CREDENTIALS_JSON_B64 or CREDENTIALS_CONFIG)
+    credentials_b64 = CREDENTIALS_JSON_B64 or CREDENTIALS_CONFIG
+    if credentials_b64:
+        try:
+            credentials_json = json.loads(base64.b64decode(credentials_b64))
+            creds = service_account.Credentials.from_service_account_info(credentials_json, scopes=SCOPES)
+            print("Using base64 encoded credentials (service account)")
+        except Exception as e:
+            print(f"Error using base64 encoded credentials: {e}")
+            creds = None
     
     # Check for explicit service account authentication first (custom SERVICE_ACCOUNT_PATH)
     if not creds and SERVICE_ACCOUNT_PATH and os.path.exists(SERVICE_ACCOUNT_PATH):
@@ -65,14 +75,32 @@ async def spreadsheet_lifespan(server: FastMCP) -> AsyncIterator[SpreadsheetCont
     # Fall back to OAuth flow if service account auth failed or not configured
     if not creds:
         print("Trying OAuth authentication flow")
-        if os.path.exists(TOKEN_PATH):
-            with open(TOKEN_PATH, 'r') as token:
-                creds = Credentials.from_authorized_user_info(json.load(token), SCOPES)
+        
+        # Check for base64 encoded token first
+        if TOKEN_JSON_B64:
+            try:
+                token_json = json.loads(base64.b64decode(TOKEN_JSON_B64))
+                creds = Credentials.from_authorized_user_info(token_json, SCOPES)
+                print("Using base64 encoded token")
+            except Exception as e:
+                print(f"Error using base64 encoded token: {e}")
+                creds = None
+        
+        # Fall back to token file
+        if not creds and os.path.exists(TOKEN_PATH):
+            try:
+                with open(TOKEN_PATH, 'r') as token:
+                    creds = Credentials.from_authorized_user_info(json.load(token), SCOPES)
+                print("Using token from file")
+            except Exception as e:
+                print(f"Error loading token from file: {e}")
+                creds = None
                 
         # If credentials are not valid or don't exist, get new ones
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
+                print("Refreshed expired OAuth token")
             else:
                 try:
                     flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)

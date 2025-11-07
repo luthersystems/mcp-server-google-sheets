@@ -32,3 +32,8 @@ strict = true
 
 [project.scripts]
 mcp-google-sheets = "mcp_google_sheets:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]

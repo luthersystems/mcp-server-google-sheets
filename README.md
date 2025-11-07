@@ -223,10 +223,20 @@ The server needs credentials to access Google APIs. Choose one method:
             ```
         *   **(Caution):** Avoid pasting sensitive credentials into untrusted online encoders.
     3.  **Set the Environment Variable:**
-        *   `CREDENTIALS_CONFIG`: Set this variable to the **full Base64 string** you just generated.
+        *   `CREDENTIALS_CONFIG` or `CREDENTIALS_JSON_B64`: Set this variable to the **full Base64 string** you just generated.
             ```bash
             # Example (Linux/macOS) - Use the actual string generated
+            export CREDENTIALS_JSON_B64="ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb..."
+            # Or use CREDENTIALS_CONFIG (both work the same way)
             export CREDENTIALS_CONFIG="ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb..."
+            ```
+    4.  **For OAuth tokens**, you can also provide the token as base64:
+        *   First, authenticate once and get your `token.json` file.
+        *   Encode it to base64 using the same method as above.
+        *   Set `TOKEN_JSON_B64` environment variable:
+            ```bash
+            # Example (Linux/macOS)
+            export TOKEN_JSON_B64="ewogICJ0b2tlbiI6ICJhYmMxMjMuLi4i..."
             ```
 
 ### Method D: Application Default Credentials (ADC) 🌐
@@ -251,21 +261,23 @@ The server needs credentials to access Google APIs. Choose one method:
 
 The server checks for credentials in this order:
 
-1.  `CREDENTIALS_CONFIG` (Base64 content)
+1.  `CREDENTIALS_JSON_B64` or `CREDENTIALS_CONFIG` (Base64 content)
 2.  `SERVICE_ACCOUNT_PATH` (Path to Service Account JSON)
-3.  `CREDENTIALS_PATH` (Path to OAuth JSON) - triggers interactive flow if token is missing/expired
+3.  `TOKEN_JSON_B64` (Base64 encoded OAuth token) or `CREDENTIALS_PATH` (Path to OAuth JSON) - triggers interactive flow if token is missing/expired
 4.  **Application Default Credentials (ADC)** - automatic fallback
 
 **Environment Variable Summary:**
 
 | Variable               | Method(s)                   | Description                                                     | Default          |
 | :--------------------- | :-------------------------- | :-------------------------------------------------------------- | :--------------- |
+| `CREDENTIALS_JSON_B64` | Service Account / OAuth 2.0 | Base64 encoded JSON string of credentials content (same as CREDENTIALS_CONFIG). | -                |
+| `CREDENTIALS_CONFIG`   | Service Account / OAuth 2.0 | Base64 encoded JSON string of credentials content (alias for CREDENTIALS_JSON_B64). | -                |
+| `TOKEN_JSON_B64`       | OAuth 2.0                   | Base64 encoded JSON string of OAuth token content.              | -                |
 | `SERVICE_ACCOUNT_PATH` | Service Account             | Path to the Service Account JSON key file (MCP server specific). | -                |
 | `GOOGLE_APPLICATION_CREDENTIALS` | ADC                   | Path to service account key (Google's standard variable).       | -                |
 | `DRIVE_FOLDER_ID`      | Service Account             | ID of the Google Drive folder shared with the Service Account.  | -                |
 | `CREDENTIALS_PATH`     | OAuth 2.0                   | Path to the OAuth 2.0 Client ID JSON file.                    | `credentials.json` |
 | `TOKEN_PATH`           | OAuth 2.0                   | Path to store the generated OAuth token.                        | `token.json`     |
-| `CREDENTIALS_CONFIG`   | Service Account / OAuth 2.0 | Base64 encoded JSON string of credentials content.              | -                |
 
 ---
 
@@ -361,7 +373,51 @@ Add the server config to `claude_desktop_config.json` under `mcpServers`. Choose
 </details>
 
 <details>
-<summary>🔵 Config: uvx + CREDENTIALS_CONFIG (Service Account Example)</summary>
+<summary>🔵 Config: uvx + CREDENTIALS_JSON_B64 (Base64 Credentials)</summary>
+
+```json
+{
+  "mcpServers": {
+    "google-sheets": {
+      "command": "uvx",
+      "args": ["mcp-google-sheets@latest"],
+      "env": {
+        "CREDENTIALS_JSON_B64": "ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOiAi...",
+        "DRIVE_FOLDER_ID": "your_shared_folder_id_here"
+      }
+    }
+  }
+}
+```
+*Note: Paste the full Base64 string for CREDENTIALS_JSON_B64. DRIVE_FOLDER_ID is still needed for Service Account folder context.*
+
+**🍎 macOS Note:** If you get a `spawn uvx ENOENT` error, replace `"command": "uvx"` with `"command": "/Users/yourusername/.local/bin/uvx"` (replace `yourusername` with your actual username).
+</details>
+
+<details>
+<summary>🔵 Config: uvx + CREDENTIALS_JSON_B64 + TOKEN_JSON_B64 (OAuth with Base64)</summary>
+
+```json
+{
+  "mcpServers": {
+    "google-sheets": {
+      "command": "uvx",
+      "args": ["mcp-google-sheets@latest"],
+      "env": {
+        "CREDENTIALS_JSON_B64": "ewogICJpbnN0YWxsZWQiOiB7CiAgICAiY2xpZW50X2lkIjogIi4uLi4uLg==",
+        "TOKEN_JSON_B64": "ewogICJ0b2tlbiI6ICJhYmMxMjMuLi4iLAogICJyZWZyZXNoX3Rva2VuIjogIi4uLiI="
+      }
+    }
+  }
+}
+```
+*Note: This configuration allows you to provide both OAuth credentials and token as base64 encoded strings, useful for containerized environments.*
+
+**🍎 macOS Note:** If you get a `spawn uvx ENOENT` error, replace `"command": "uvx"` with `"command": "/Users/yourusername/.local/bin/uvx"` (replace `yourusername` with your actual username).
+</details>
+
+<details>
+<summary>🔵 Config: uvx + CREDENTIALS_CONFIG (Service Account Example - Legacy)</summary>
 
 ```json
 {
@@ -377,7 +433,7 @@ Add the server config to `claude_desktop_config.json` under `mcpServers`. Choose
   }
 }
 ```
-*Note: Paste the full Base64 string for CREDENTIALS_CONFIG. DRIVE_FOLDER_ID is still needed for Service Account folder context.*
+*Note: CREDENTIALS_CONFIG is an alias for CREDENTIALS_JSON_B64 and works the same way. Both are supported for backwards compatibility.*
 
 **🍎 macOS Note:** If you get a `spawn uvx ENOENT` error, replace `"command": "uvx"` with `"command": "/Users/yourusername/.local/bin/uvx"` (replace `yourusername` with your actual username).
 </details>
